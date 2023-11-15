@@ -2,47 +2,51 @@
 // split into groups with a double line break. Return
 // the calorie count of the group with the most calories
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 enum State {
     Group,
-    Break
+    Break,
 }
 
-impl Default for State {
-    fn default() -> Self {
-        State::Group
-    }
-}
-
-
-#[derive(Default)]
+#[derive(Debug)]
 pub struct Calculator {
-    max: i32,
+    heap: Vec<i32>,
     curr_sum: i32,
-    state: State
+    state: State,
 }
 
 impl Calculator {
     pub fn new() -> Self {
-        Self::default()
+        Calculator {
+            heap: Vec::with_capacity(3),
+            curr_sum: 0,
+            state: State::Group,
+        }
     }
-  
+
     pub fn process_line(&mut self, line: &str) {
         match (self.state, line) {
             (State::Group, "") => {
-                self.max = self.max.max(self.curr_sum);
+                if self.heap.len() < 3 {
+                    self.heap.push(self.curr_sum);
+                } else {
+                    if self.curr_sum > self.heap[0] {
+                        self.heap[0] = self.curr_sum;
+                    }
+                    self.heap.sort_unstable();
+                }
                 self.state = State::Break;
-            },
+            }
             (State::Group, s) => {
                 let calories: i32 = s.parse().unwrap();
                 self.curr_sum += calories;
-            },
+            }
             (State::Break, "") => panic!("invalid state"),
             (State::Break, s) => {
                 let calories: i32 = s.parse().unwrap();
                 self.curr_sum = calories;
                 self.state = State::Group;
-            },
+            }
         }
     }
 
@@ -50,6 +54,6 @@ impl Calculator {
         if self.state == State::Group {
             panic!("cannot interrupt calculation")
         }
-        self.max
+        self.heap.iter().sum()
     }
 }
