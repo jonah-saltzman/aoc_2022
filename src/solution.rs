@@ -2,6 +2,24 @@
 // split into groups with a double line break. Return
 // the calorie count of the group with the most calories
 
+use aoc_2022::MinHeap;
+use std::cmp::Ordering;
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
+struct Reverse<T>(T);
+
+impl<T: PartialOrd> PartialOrd for Reverse<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        other.0.partial_cmp(&self.0)
+    }
+}
+
+impl<T: Ord> Ord for Reverse<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.0.cmp(&self.0)
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum State {
     Group,
@@ -10,7 +28,7 @@ enum State {
 
 #[derive(Debug)]
 pub struct Calculator {
-    heap: Vec<i32>,
+    heap: MinHeap<Reverse<i32>>,
     curr_sum: i32,
     state: State,
 }
@@ -18,7 +36,7 @@ pub struct Calculator {
 impl Calculator {
     pub fn new() -> Self {
         Calculator {
-            heap: Vec::with_capacity(3),
+            heap: MinHeap::new(),
             curr_sum: 0,
             state: State::Group,
         }
@@ -27,14 +45,7 @@ impl Calculator {
     pub fn process_line(&mut self, line: &str) {
         match (self.state, line) {
             (State::Group, "") => {
-                if self.heap.len() < 3 {
-                    self.heap.push(self.curr_sum);
-                } else {
-                    if self.curr_sum > self.heap[0] {
-                        self.heap[0] = self.curr_sum;
-                    }
-                    self.heap.sort_unstable();
-                }
+                self.heap.push(Reverse(self.curr_sum));
                 self.state = State::Break;
             }
             (State::Group, s) => {
@@ -50,10 +61,13 @@ impl Calculator {
         }
     }
 
-    pub fn get_max_calories(&self) -> i32 {
+    pub fn get_max_calories(&mut self) -> i32 {
         if self.state == State::Group {
             panic!("cannot interrupt calculation")
         }
-        self.heap.iter().sum()
+        let mut sum = self.heap.pop().unwrap().0;
+        sum += self.heap.pop().unwrap().0;
+        sum += self.heap.pop().unwrap().0;
+        sum
     }
 }
