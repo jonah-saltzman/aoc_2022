@@ -1,23 +1,14 @@
-use std::io;
+use std::io::{self, Read, BufReader};
 
 mod solution;
 
 fn main() {
-    let mut buf = String::with_capacity(6);
-    let mut calc = solution::Calculator::new();
-    loop {
-        match io::stdin().read_line(&mut buf) {
-            Ok(0) => {
-                calc.process_line("");
-                break;
-            },
-            Ok(n) => {
-                calc.process_line(&buf[..n - 1]);
-                buf.clear();
-            },
-            Err(e) => panic!("{:?}", e)
-        }
+    let mut buf = [0u8; 4];
+    let mut calc = solution::Calculator::default();
+    let mut reader = BufReader::new(io::stdin().lock());
+    while let Ok(_) = reader.read_exact(&mut buf) {
+        calc.process_line(&buf);
     }
-    let answer = calc.get_max_calories();
+    let answer = calc.get_score();
     println!("{}", answer);
 }
