@@ -7,6 +7,15 @@ const fn win_move(c: u8) -> u8 {
     }
 }
 
+const fn lose_move(c: u8) -> u8 {
+    match c {
+        b'A' => b'Z',
+        b'B' => b'X',
+        b'C' => b'Y',
+        _ => unreachable!(),
+    }
+}
+
 const fn move_score(c: u8) -> i32 {
     match c {
         b'X' => 1,
@@ -24,17 +33,16 @@ pub struct Calculator {
 impl Calculator {
     pub fn process_line(&mut self, line: &[u8; 4]) {
         let opponent: u8 = line[0];
-        let player: u8 = line[2];
-        let is_win: bool = win_move(opponent) == player;
-        let game_score = if is_win {
-            6
-        } else if (player - 23) == opponent {
-            3
+        let outcome: u8 = line[2];
+        let (choice, score): (u8, i32) = if outcome == 88 {
+            (lose_move(opponent), 0)
+        } else if outcome == 89 {
+            (opponent + 23, 3)
         } else {
-            0
+            (win_move(opponent), 6)
         };
-        let move_score = move_score(player);
-        self.score += game_score + move_score;
+        let total_score = score + move_score(choice);
+        self.score += total_score;
     }
 
     pub fn get_score(&self) -> i32 {
