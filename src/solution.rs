@@ -1,48 +1,36 @@
-const fn win_move(c: u8) -> u8 {
-    match c {
-        b'A' => b'Y',
-        b'B' => b'Z',
-        b'C' => b'X',
-        _ => unreachable!(),
-    }
-}
+use std::collections::HashSet;
 
-const fn lose_move(c: u8) -> u8 {
-    match c {
-        b'A' => b'Z',
-        b'B' => b'X',
-        b'C' => b'Y',
-        _ => unreachable!(),
-    }
-}
-
-const fn move_score(c: u8) -> i32 {
-    match c {
-        b'X' => 1,
-        b'Y' => 2,
-        b'Z' => 3,
-        _ => unreachable!(),
+fn get_priority(item: u8) -> i32 {
+    match item {
+        b'a'..=b'z' => (item - 96).into(),
+        b'A'..=b'Z' => (item - 64 + 26).into(),
+        _ => unreachable!()
     }
 }
 
 #[derive(Default)]
 pub struct Calculator {
     score: i32,
+    items: HashSet<u8>
 }
 
 impl Calculator {
-    pub fn process_line(&mut self, line: &[u8; 4]) {
-        let opponent: u8 = line[0];
-        let outcome: u8 = line[2];
-        let (choice, score): (u8, i32) = if outcome == 88 {
-            (lose_move(opponent), 0)
-        } else if outcome == 89 {
-            (opponent + 23, 3)
-        } else {
-            (win_move(opponent), 6)
+    pub fn process_line(&mut self, line: &[u8]) {
+        let mid = line.len() / 2;
+        for &item in &line[..mid] {
+            self.items.insert(item);
+        }
+        let val = 'val: {
+            for item in &line[mid..] {
+                if self.items.contains(item) {
+                    break 'val *item
+                }
+            }
+            unreachable!()
         };
-        let total_score = score + move_score(choice);
-        self.score += total_score;
+        let priority = get_priority(val);
+        self.score += priority;
+        self.items.clear();
     }
 
     pub fn get_score(&self) -> i32 {
