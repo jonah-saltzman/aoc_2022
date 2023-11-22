@@ -1,24 +1,38 @@
-pub struct Parser {}
+use crate::solution::Command;
 
-impl Parser {
-    pub fn parse_line(line: &str) -> ((i32, i32), (i32, i32)) {
-        let nums: Vec<i32> = line
-            .split(',')
-            .map(|s| s.split('-').map(|s| s.parse().unwrap()))
-            .flatten()
-            .collect();
-        ((nums[0], nums[1]), (nums[2], nums[3]))
-    }
+pub fn parse_init_state(line: &str) -> Vec<char> {
+    line.chars().collect()
+}
+
+pub fn parse_instructions(line: &str) -> Command {
+    let mut tokens = line.split(' ');
+    let qty: usize = tokens.nth(1).unwrap().parse().unwrap();
+    let src: usize = tokens.nth(1).unwrap().parse().unwrap();
+    let dst: usize = tokens.nth(1).unwrap().parse().unwrap();
+    Command { qty, src, dst }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::parser::Parser;
+    use super::*;
+    #[test]
+    fn init_test() {
+        let input = "MCD";
+        let output = parse_init_state(input);
+        assert_eq!(output, vec!['M', 'C', 'D'])
+    }
 
     #[test]
-    fn parser_test() {
-        let line: &str = "3-47,46-86";
-        let parsed = Parser::parse_line(line);
-        assert_eq!(parsed, ((3, 47), (46, 86)));
+    fn cmd_test() {
+        let input = "move 3 from 1 to 2";
+        let cmd = parse_instructions(input);
+        assert_eq!(
+            cmd,
+            Command {
+                qty: 3,
+                src: 1,
+                dst: 2
+            }
+        );
     }
 }

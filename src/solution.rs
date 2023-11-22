@@ -1,21 +1,32 @@
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Command {
+    pub qty: usize,
+    pub src: usize,
+    pub dst: usize,
+}
+
 #[derive(Default)]
 pub struct Calculator {
-    score: i32,
+    state: Vec<Vec<char>>,
 }
 
 impl Calculator {
-    pub fn process_pairs(&mut self, pairs: ((i32, i32), (i32, i32))) {
-        let (higher, lower) = if pairs.0 .0 > pairs.1 .0 {
-            (pairs.0, pairs.1)
-        } else {
-            (pairs.1, pairs.0)
-        };
-        if higher.0 <= lower.1 {
-            self.score += 1;
+    pub fn new(init: Vec<Vec<char>>) -> Self {
+        Self { state: init }
+    }
+
+    pub fn handle_command(&mut self, cmd: Command) {
+        for _ in 0..cmd.qty {
+            let moved = self.state[cmd.src - 1].pop().unwrap();
+            self.state[cmd.dst - 1].push(moved);
         }
     }
 
-    pub fn get_score(&self) -> i32 {
-        self.score
+    pub fn get_answer(self) -> Vec<char> {
+        let mut answer = vec![];
+        for mut stack in self.state.into_iter() {
+            answer.push(stack.pop().unwrap());
+        }
+        answer
     }
 }

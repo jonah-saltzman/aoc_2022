@@ -16,6 +16,12 @@ pub struct MinHeap<T> {
     buf: Vec<T>,
 }
 
+impl<T> Default for MinHeap<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> MinHeap<T> {
     pub fn new() -> Self {
         MinHeap { buf: vec![] }
@@ -31,6 +37,10 @@ impl<T> MinHeap<T> {
 
     pub fn len(&self) -> usize {
         self.buf.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
     }
 }
 
