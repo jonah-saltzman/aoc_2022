@@ -15,10 +15,9 @@ impl Calculator {
     }
 
     pub fn handle_command(&mut self, cmd: Command) {
-        for _ in 0..cmd.qty {
-            let moved = self.state[cmd.src - 1].pop().unwrap();
-            self.state[cmd.dst - 1].push(moved);
-        }
+        let split_at = self.state[cmd.src - 1].len() - cmd.qty;
+        let moved = self.state[cmd.src - 1].split_off(split_at);
+        self.state[cmd.dst - 1].extend(moved);
     }
 
     pub fn get_answer(self) -> Vec<char> {
