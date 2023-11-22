@@ -3,7 +3,6 @@ use std::io::{self, BufRead, BufReader};
 mod parser;
 mod solution;
 
-use parser::parse_instructions;
 use solution::Calculator;
 
 fn main() {
@@ -24,7 +23,7 @@ fn main() {
         if n == 0 {
             break;
         }
-        let cmd = parse_instructions(&buf[..n - 1]);
+        let cmd = parser::parse_instructions(&buf[..n - 1]);
         calc.handle_command(cmd);
         buf.clear();
     }
