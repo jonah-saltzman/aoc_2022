@@ -5,7 +5,6 @@ pub struct Command {
     pub dst: usize,
 }
 
-#[derive(Default)]
 pub struct Calculator {
     state: Vec<Vec<char>>,
 }
