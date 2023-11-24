@@ -10,7 +10,7 @@ pub struct Calculator {
     window: VecDeque<u8>,
     counts: [u8; 26],
     repeats: u8,
-    idx: usize
+    idx: usize,
 }
 
 impl Calculator {
@@ -45,22 +45,21 @@ impl Calculator {
     pub fn process_chars(&mut self, chars: &[u8]) -> Option<usize> {
         for &c in chars {
             self.push(c);
-            if self.idx <= 4 {
+            if self.idx <= 14 {
                 if self.is_finished() {
-                    return Some(self.idx)
+                    return Some(self.idx);
                 }
                 continue;
             }
             self.pop();
             if self.is_finished() {
-                return Some(self.idx)
+                return Some(self.idx);
             }
         }
         None
     }
 
     pub fn is_finished(&self) -> bool {
-        self.repeats == 0 && self.idx >= 4
+        self.repeats == 0 && self.idx >= 14
     }
-
 }

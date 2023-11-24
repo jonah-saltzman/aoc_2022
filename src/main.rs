@@ -5,7 +5,7 @@ mod solution;
 use solution::Calculator;
 
 fn main() {
-    let mut buf: [u8; 256] = [0; 256];
+    let mut buf: [u8; 4096] = [0; 4096];
     let mut reader = io::stdin().lock();
     let mut calc = Calculator::new();
     while let Ok(n) = reader.read(&mut buf) {
