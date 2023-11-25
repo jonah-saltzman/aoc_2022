@@ -1,5 +1,3 @@
-#![allow(unused, dead_code)]
-
 pub struct MinHeapIterator<T> {
     heap: MinHeap<T>,
 }
@@ -118,7 +116,7 @@ impl<T: Ord + Copy> MinHeap<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::MinHeap;
+    use crate::min_heap::MinHeap;
 
     #[test]
     fn sorts_numbers() {
