@@ -1,175 +1,187 @@
-use id_arena::{Arena, Id};
-use std::{collections::HashSet, fmt::Debug};
+use crate::arena::{Arena, NodeId};
+use std::collections::{hash_set, HashSet};
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum TreeError {
-    #[error("this tree already has a root but no parent was specified")]
-    ExistingRoot,
-    #[error("given parent node does not exist")]
-    NoParent,
-    #[error("specified node does not exist")]
-    NotFound,
-    #[error("cannot delete root node with more than 1 child")]
-    DeleteRootWithChildren,
+    #[error("added a node without parent but root was already set")]
+    RootAlreadyExists,
+    #[error("specified a parent but root doesn't exist")]
+    NoRoot,
 }
 
-type TreeNodeIdInternal<T> = Id<TreeNode<T>>;
+pub struct IterChildren<'a, T> {
+    tree: &'a Tree<T>,
+    iter: hash_set::Iter<'a, NodeId>,
+}
 
-pub struct TreeNodeId<T>(TreeNodeIdInternal<T>);
-
-impl<T> Clone for TreeNodeId<T> {
-    fn clone(&self) -> Self {
-        Self(self.0)
+impl<'a, T> Iterator for IterChildren<'a, T> {
+    type Item = (NodeId, &'a T);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iter.next() {
+            Some(&id) => Some((id, self.tree.get(id))),
+            None => None,
+        }
     }
 }
 
-impl<T> PartialEq for TreeNodeId<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+pub struct IterDescendants<'a, T> {
+    tree: &'a Tree<T>,
+    stack: Vec<IterChildren<'a, T>>,
+    current: IterChildren<'a, T>,
+}
+
+impl<'a, T> Iterator for IterDescendants<'a, T> {
+    type Item = (NodeId, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current.next() {
+            Some(item) => {
+                let node_children = self.tree.children_internal(item.0);
+                self.stack.push(node_children);
+                Some(item)
+            }
+            None => match self.stack.pop() {
+                Some(iter) => {
+                    self.current = iter;
+                    self.next()
+                }
+                None => None,
+            },
+        }
     }
 }
 
-impl<T> Debug for TreeNodeId<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Id").field("idx", &self.0).finish()
-    }
+pub struct IterAncestors<'a, T> {
+    tree: &'a Tree<T>,
+    current: NodeId,
 }
 
-impl<T> Copy for TreeNodeId<T> {}
+impl <'a, T> Iterator for IterAncestors<'a, T> {
+    type Item = (NodeId, &'a T);
 
-trait TreeNodeIdBehavior<T> {
-    fn id(&self) -> TreeNodeIdInternal<T>;
-}
-
-impl<T> TreeNodeIdBehavior<T> for TreeNodeId<T> {
-    fn id(&self) -> TreeNodeIdInternal<T> {
-        self.0
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(parent) = self.tree.parent(self.current) {
+            let val = self.tree.get(parent);
+            let item = (parent, val);
+            self.current = parent;
+            Some(item)
+        } else {
+            None
+        }
     }
 }
 
 struct TreeNode<T> {
-    parent: Option<TreeNodeIdInternal<T>>,
-    children: HashSet<TreeNodeIdInternal<T>>,
+    parent: Option<NodeId>,
+    children: HashSet<NodeId>,
     value: T,
 }
 
-#[derive(Default)]
+impl<T> TreeNode<T> {
+    fn new(val: T) -> Self {
+        Self {
+            parent: None,
+            children: HashSet::new(),
+            value: val,
+        }
+    }
+}
+
 pub struct Tree<T> {
     arena: Arena<TreeNode<T>>,
-    root: Option<TreeNodeIdInternal<T>>,
+    root: Option<NodeId>,
+}
+
+impl<T> Default for Tree<T> {
+    fn default() -> Self {
+        Self {
+            arena: Default::default(),
+            root: None,
+        }
+    }
 }
 
 impl<T> Tree<T> {
     pub fn new() -> Self {
-        Tree {
-            arena: Arena::new(),
-            root: None,
-        }
+        Default::default()
     }
 
-    // pub fn set_root(&mut self, val: T) -> Option<T> {
-    //     if let Some(id) = self.root {
-    //         Some(std::mem::replace(&mut self.arena.get_mut(id).unwrap().value, val))
-    //     } else {
-    //         let new_root = self.arena.
-    //         None
-    //     }
-    // }
-
-    pub fn add(
-        &mut self,
-        val: T,
-        parent_id: Option<TreeNodeId<T>>,
-    ) -> Result<TreeNodeId<T>, TreeError> {
-        match (parent_id, self.root) {
-            (Some(pid), Some(_)) => {
-                let new_node = self.arena.alloc(TreeNode {
-                    parent: Some(pid.id()),
-                    children: HashSet::new(),
-                    value: val,
-                });
-                let parent = self.arena.get_mut(pid.id()).ok_or(TreeError::NoParent)?;
-                parent.children.insert(new_node);
-                Ok(TreeNodeId(new_node))
-            }
-            (Some(_), None) => panic!("invalid state: parent without root"),
-            (None, None) => {
-                let new_root = self.arena.alloc(TreeNode {
-                    parent: None,
-                    children: HashSet::new(),
-                    value: val,
-                });
-                self.root = Some(new_root);
-                Ok(TreeNodeId(new_root))
-            }
-            (None, Some(_)) => Err(TreeError::ExistingRoot),
+    pub fn add_node(&mut self, val: T, parent: Option<NodeId>) -> Result<NodeId, TreeError> {
+        if self.root.is_some() && parent.is_none() {
+            return Err(TreeError::RootAlreadyExists);
         }
-    }
-    pub fn delete(&mut self, node_id: TreeNodeId<T>) -> impl Iterator<Item = TreeNodeId<T>> {
-        let parent = self
-            .arena
-            .get(node_id.id())
-            .expect("invariant failed: node exists but not found")
-            .parent;
-        let root = self
-            .root
-            .expect("invariant failed: node exists without root");
-        if let Some(pid) = parent {
-            let parent = self
-                .arena
-                .get_mut(pid)
-                .expect("invariant failed: parent does not exist");
-            if parent.children.remove(&node_id.id()) == false {
-                panic!("invariant failed: parent did not point to child")
-            }
+        if parent.is_some() && self.root.is_none() {
+            return Err(TreeError::NoRoot);
+        }
+        let next_id = self.arena.next_id();
+        let mut new_node = TreeNode::new(val);
+        if let (Some(_), Some(parent)) = (self.root, parent) {
+            new_node.parent = Some(parent);
+            let parent_node = self.arena.get_node_mut(parent).unwrap();
+            parent_node.children.insert(next_id);
         } else {
-            assert_eq!(
-                root,
-                node_id.id(),
-                "invariant failed: node without parent must be root"
-            );
-            self.root = None;
+            self.root = Some(next_id)
         }
-        let children = std::mem::take(
-            &mut self
-                .arena
-                .get_mut(node_id.id())
-                .expect("already checked above")
-                .children,
-        );
-        children.into_iter().map(|e| TreeNodeId(e))
-    }
-    pub fn get(&self, node_id: TreeNodeId<T>) -> Option<&T> {
-        self.arena.get(node_id.id()).map(|v| &v.value)
-    }
-    pub fn get_mut(&mut self, node_id: TreeNodeId<T>) -> Option<&mut T> {
-        self.arena.get_mut(node_id.id()).map(|v| &mut v.value)
-    }
-    pub fn children(
-        &self,
-        node_id: TreeNodeId<T>,
-    ) -> Option<impl Iterator<Item = TreeNodeId<T>> + '_> {
-        self.arena
-            .get(node_id.id())
-            .map(|node| node.children.iter().map(|e| TreeNodeId(*e)))
-    }
-    pub fn parent(&self, node_id: TreeNodeId<T>) -> Option<TreeNodeId<T>> {
-        self.arena
-            .get(node_id.id())
-            .map(|p| p.parent.map(|id| TreeNodeId(id)))
-            .flatten()
+        Ok(self.arena.add_node(new_node))
     }
 
-    // pub fn descendants(&self, node_id: TreeNodeId<T>) -> Option<impl Iterator<Item = TreeNodeId<T>> + '_> {
-    //     self.arena.get(node_id.id())
-    //         .map(|_| std::iter::successors(None, move |stack| {
-    //             if let Some(id) = stack.last() {
+    pub fn get(&self, node_id: NodeId) -> &T {
+        let node = self.arena.get_node(node_id).unwrap();
+        &node.value
+    }
 
-    //                 Some(stack.pop().unwrap())
-    //             } else {
-    //                 None
-    //             }
-    //         }).flat_map(|stack| stack.into_iter()))
-    // }
+    pub fn get_mut(&mut self, node_id: NodeId) -> &mut T {
+        let node = self.arena.get_node_mut(node_id).unwrap();
+        &mut node.value
+    }
+
+    pub fn root(&self) -> Option<NodeId> {
+        self.root
+    }
+
+    pub fn children<'a>(&'a self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &'a T)> + 'a {
+        self.children_internal(node_id)
+    }
+
+    fn children_internal<'a>(&'a self, node_id: NodeId) -> IterChildren<'a, T> {
+        let node = self.arena.get_node(node_id).unwrap();
+        let iter = node.children.iter();
+        IterChildren {
+            iter,
+            tree: self,
+        }
+    }
+
+    pub fn descendants<'a>(&'a self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &'a T)> + 'a {
+        IterDescendants {
+            tree: self,
+            stack: vec![],
+            current: self.children_internal(node_id),
+        }
+    }
+
+    pub fn parent(&self, node_id: NodeId) -> Option<NodeId> {
+        self.arena.get_node(node_id).map(|node| node.parent).flatten()
+    }
+
+    pub fn ancestors<'a>(&'a self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &'a T)> {
+        IterAncestors {
+            tree: self,
+            current: node_id
+        }
+    }
+
+    pub fn mutate_ancestors<F>(&mut self, node_id: NodeId, mut f: F)
+    where
+        F: FnMut(NodeId, &mut T)
+    {
+        let mut current = node_id;
+        while let Some(parent) = self.parent(current) {
+            let node = self.arena.get_node_mut(parent).unwrap();
+            let val_ref = &mut node.value;
+            f(parent, val_ref);
+            current = parent;
+        }
+    }
 }

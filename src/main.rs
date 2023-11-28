@@ -1,21 +1,28 @@
-use std::io::{self, Read};
+use std::io::{self, BufRead};
 
 mod solution;
+mod parser;
 
 use solution::Calculator;
+use parser::Parser;
 
 fn main() {
-    let mut buf: [u8; 4096] = [0; 4096];
+    let mut buf = String::new();
     let mut reader = io::stdin().lock();
     let mut calc = Calculator::new();
-    while let Ok(n) = reader.read(&mut buf) {
+    let mut parser = Parser::new();
+    while let Ok(n) = reader.read_line(&mut buf) {
         if n == 0 {
-            println!("EOF without answer");
-            break;
-        }
-        if let Some(ans) = calc.process_chars(&buf[..n]) {
-            println!("{}", ans);
+            if let Some(group) = parser.end() {
+                calc.handle_group(group);
+            }
             break
         }
+        for group in parser.line(&buf[..n - 1]) {
+            calc.handle_group(group);
+        }
+        buf.clear();
     }
+    let answer = calc.get_result();
+    println!("{}", answer);
 }
