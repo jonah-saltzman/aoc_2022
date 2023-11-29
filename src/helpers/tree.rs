@@ -184,4 +184,12 @@ impl<T> Tree<T> {
             current = parent;
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.arena.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }

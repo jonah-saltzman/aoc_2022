@@ -1,8 +1,15 @@
+#[derive(Debug)]
+pub enum CdTarget {
+    Root,
+    Parent,
+    Named(String)
+}
+
 
 #[derive(Debug)]
 pub enum Command {
     Ls,
-    Cd(String),
+    Cd(CdTarget),
 }
 
 
@@ -97,7 +104,12 @@ impl Parser {
             },
             "cd" => {
                 let target = tokens.next().unwrap();
-                Command::Cd(target.to_owned())
+                let target: CdTarget = match target {
+                    "/" => CdTarget::Root,
+                    ".." => CdTarget::Parent,
+                    dir => CdTarget::Named(dir.to_owned())
+                };
+                Command::Cd(target)
             },
             _ => unreachable!()
         }

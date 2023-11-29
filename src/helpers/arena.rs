@@ -86,6 +86,14 @@ impl<T> Arena<T> {
     pub fn next_id(&self) -> NodeId {
         NodeId { idx: self.items.len(), arena: self.id }
     }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl<T> std::ops::Index<NodeId> for Arena<T> {
