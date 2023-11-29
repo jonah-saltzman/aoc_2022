@@ -56,12 +56,12 @@ impl Calculator {
             }
             CdTarget::Named(target) => {
                 let current = self.current_node.unwrap();
-                let child = self
+                let (child_id, _) = self
                     .tree
                     .children(current)
                     .find(|&(_, dir)| dir.name == target)
                     .unwrap();
-                self.current_node = Some(child.0);
+                self.current_node = Some(child_id);
             }
         }
     }
@@ -82,7 +82,7 @@ impl Calculator {
         }
     }
 
-    fn calculate_node_indirect(&mut self, node_id: NodeId) -> usize {
+    fn node_indirect(&mut self, node_id: NodeId) -> usize {
         if let Some(size) = self.tree.get(node_id).size_indirect {
             return size;
         }
@@ -90,17 +90,11 @@ impl Calculator {
         let mut indirect: usize = 0;
         for child_id in children {
             let child = self.tree.get(child_id);
-            let initial_child_direct = child.size_direct;
+            let child_direct = child.size_direct;
             let initial_child_indirect = child.size_indirect;
-            match initial_child_indirect {
-                Some(child_indirect) => {
-                    indirect += child_indirect + child.size_direct;
-                }
-                None => {
-                    let child_indrect = self.calculate_node_indirect(child_id);
-                    indirect += child_indrect + initial_child_direct;
-                }
-            }
+            let child_indirect =
+                initial_child_indirect.unwrap_or_else(|| self.node_indirect(child_id));
+            indirect += child_direct + child_indirect;
         }
         self.tree.get_mut(node_id).size_indirect = Some(indirect);
         indirect
@@ -108,14 +102,17 @@ impl Calculator {
 
     pub fn get_result(mut self) -> usize {
         let root = self.tree.root().unwrap();
-        self.calculate_node_indirect(root);
-        let mut result: usize = 0;
-        for node in self.tree.into_iter() {
-            let node_total = node.size_direct + node.size_indirect.unwrap();
-            if node_total <= 100000 {
-                result += node_total;
-            }
-        }
-        result
+        self.node_indirect(root);
+        self.tree
+            .into_iter()
+            .filter_map(|node| {
+                let total = node.size_direct + node.size_indirect.unwrap();
+                if total <= 100000 {
+                    Some(total)
+                } else {
+                    None
+                }
+            })
+            .sum()
     }
 }
