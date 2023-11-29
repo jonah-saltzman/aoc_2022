@@ -1,3 +1,5 @@
+// changes must not break day7
+
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicUsize;
 
