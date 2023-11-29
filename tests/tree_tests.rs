@@ -41,7 +41,12 @@ fn descendants() {
     let mut descendants_of_b = vec![c, d, e];
     tree.descendants(root).for_each(|child| {
         assert!(descendants_of_root.iter().contains(&child.0));
-        descendants_of_root.remove(descendants_of_root.iter().position(|&e| e == child.0).unwrap());
+        descendants_of_root.remove(
+            descendants_of_root
+                .iter()
+                .position(|&e| e == child.0)
+                .unwrap(),
+        );
     });
     tree.descendants(b).for_each(|child| {
         assert!(descendants_of_b.iter().contains(&child.0));

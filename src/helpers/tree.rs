@@ -1,5 +1,5 @@
 use crate::arena::{Arena, NodeId};
-use std::collections::{hash_set, HashSet};
+use std::{slice, vec::IntoIter};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -12,7 +12,7 @@ pub enum TreeError {
 
 pub struct IterChildren<'a, T> {
     tree: &'a Tree<T>,
-    iter: hash_set::Iter<'a, NodeId>,
+    iter: slice::Iter<'a, NodeId>,
 }
 
 impl<'a, T> Iterator for IterChildren<'a, T> {
@@ -57,7 +57,7 @@ pub struct IterAncestors<'a, T> {
     current: NodeId,
 }
 
-impl <'a, T> Iterator for IterAncestors<'a, T> {
+impl<'a, T> Iterator for IterAncestors<'a, T> {
     type Item = (NodeId, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -74,7 +74,7 @@ impl <'a, T> Iterator for IterAncestors<'a, T> {
 
 struct TreeNode<T> {
     parent: Option<NodeId>,
-    children: HashSet<NodeId>,
+    children: Vec<NodeId>,
     value: T,
 }
 
@@ -82,8 +82,22 @@ impl<T> TreeNode<T> {
     fn new(val: T) -> Self {
         Self {
             parent: None,
-            children: HashSet::new(),
+            children: vec![],
             value: val,
+        }
+    }
+}
+
+pub struct IterTree<T> {
+    iter: IntoIter<TreeNode<T>>,
+}
+
+impl<T> Iterator for IterTree<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iter.next() {
+            Some(node) => Some(node.value),
+            None => None,
         }
     }
 }
@@ -119,7 +133,7 @@ impl<T> Tree<T> {
         if let (Some(_), Some(parent)) = (self.root, parent) {
             new_node.parent = Some(parent);
             let parent_node = self.arena.get_node_mut(parent).unwrap();
-            parent_node.children.insert(next_id);
+            parent_node.children.push(next_id);
         } else {
             self.root = Some(next_id)
         }
@@ -140,20 +154,21 @@ impl<T> Tree<T> {
         self.root
     }
 
-    pub fn children<'a>(&'a self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &'a T)> + 'a {
+    pub fn children(&self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &T)> + '_ {
         self.children_internal(node_id)
     }
 
-    fn children_internal<'a>(&'a self, node_id: NodeId) -> IterChildren<'a, T> {
+    fn children_internal(&self, node_id: NodeId) -> IterChildren<T> {
         let node = self.arena.get_node(node_id).unwrap();
         let iter = node.children.iter();
-        IterChildren {
-            iter,
-            tree: self,
-        }
+        IterChildren { iter, tree: self }
     }
 
-    pub fn descendants<'a>(&'a self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &'a T)> + 'a {
+    pub fn children_ids(&self, node_id: NodeId) -> impl Iterator<Item = &NodeId> + '_ {
+        self.arena.get_node(node_id).unwrap().children.iter()
+    }
+
+    pub fn descendants(&self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &T)> {
         IterDescendants {
             tree: self,
             stack: vec![],
@@ -162,19 +177,19 @@ impl<T> Tree<T> {
     }
 
     pub fn parent(&self, node_id: NodeId) -> Option<NodeId> {
-        self.arena.get_node(node_id).map(|node| node.parent).flatten()
+        self.arena.get_node(node_id).and_then(|node| node.parent)
     }
 
-    pub fn ancestors<'a>(&'a self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &'a T)> {
+    pub fn ancestors(&self, node_id: NodeId) -> impl Iterator<Item = (NodeId, &T)> {
         IterAncestors {
             tree: self,
-            current: node_id
+            current: node_id,
         }
     }
 
     pub fn mutate_ancestors<F>(&mut self, node_id: NodeId, mut f: F)
     where
-        F: FnMut(NodeId, &mut T)
+        F: FnMut(NodeId, &mut T),
     {
         let mut current = node_id;
         while let Some(parent) = self.parent(current) {
@@ -185,11 +200,44 @@ impl<T> Tree<T> {
         }
     }
 
+    pub fn mutate_children<F>(&mut self, node_id: NodeId, mut f: F)
+    where
+        F: FnMut(NodeId, &mut T),
+    {
+        let children: Vec<NodeId> = self.children_ids(node_id).copied().collect();
+        for id in children {
+            let node = self.arena.get_node_mut(id).unwrap();
+            f(id, &mut node.value)
+        }
+    }
+
+    pub fn mutate_descendants<F>(&mut self, node_id: NodeId, mut f: F)
+    where
+        F: FnMut(NodeId, &mut T),
+    {
+        let mut stack: Vec<NodeId> = self.arena.get_node(node_id).unwrap().children.to_vec();
+        while let Some(id) = stack.pop() {
+            let node = self.arena.get_node_mut(id).unwrap();
+            f(id, &mut node.value);
+            stack.extend(node.children.iter())
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.arena.len()
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<T> IntoIterator for Tree<T> {
+    type IntoIter = IterTree<T>;
+    type Item = T;
+    fn into_iter(self) -> Self::IntoIter {
+        IterTree {
+            iter: self.arena.into_iter(),
+        }
     }
 }

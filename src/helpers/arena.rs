@@ -1,9 +1,17 @@
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicUsize;
 
-#[derive(Debug, Clone, Copy, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Eq)]
 pub struct NodeId {
     idx: usize,
     arena: usize,
+}
+
+impl Hash for NodeId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.arena.hash(state);
+    }
 }
 
 impl PartialEq for NodeId {
@@ -15,14 +23,20 @@ impl PartialEq for NodeId {
 pub struct Iter<'a, T> {
     arena_id: usize,
     items: &'a Vec<T>,
-    idx: usize
+    idx: usize,
 }
 
-impl <'a, T> Iterator for Iter<'a, T> {
+impl<'a, T> Iterator for Iter<'a, T> {
     type Item = (NodeId, &'a T);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(item) = self.items.get(self.idx) {
-            let item = Some((NodeId{idx: self.idx, arena: self.arena_id}, item));
+            let item = Some((
+                NodeId {
+                    idx: self.idx,
+                    arena: self.arena_id,
+                },
+                item,
+            ));
             self.idx += 1;
             item
         } else {
@@ -79,12 +93,19 @@ impl<T> Arena<T> {
         }
     }
 
-    pub fn iter<'a>(&'a self) -> impl Iterator + 'a {
-        Iter { arena_id: self.id, items: &self.items, idx: 0 }
+    pub fn iter(&self) -> impl Iterator + '_ {
+        Iter {
+            arena_id: self.id,
+            items: &self.items,
+            idx: 0,
+        }
     }
 
     pub fn next_id(&self) -> NodeId {
-        NodeId { idx: self.items.len(), arena: self.id }
+        NodeId {
+            idx: self.items.len(),
+            arena: self.id,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -93,6 +114,15 @@ impl<T> Arena<T> {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<T> IntoIterator for Arena<T> {
+    type IntoIter = std::vec::IntoIter<T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
     }
 }
 

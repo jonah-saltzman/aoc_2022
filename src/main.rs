@@ -1,10 +1,10 @@
 use std::io::{self, BufRead};
 
-mod solution;
 mod parser;
+mod solution;
 
-use solution::Calculator;
 use parser::Parser;
+use solution::Calculator;
 
 fn main() {
     let mut buf = String::new();
@@ -16,7 +16,7 @@ fn main() {
             if let Some(group) = parser.end() {
                 calc.handle_group(group);
             }
-            break
+            break;
         }
         for group in parser.line(&buf[..n - 1]) {
             calc.handle_group(group);
