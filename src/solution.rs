@@ -1,5 +1,5 @@
 use crate::parser::{CdTarget, Command, Group, LsLine, LsOutput};
-use aoc_2022::{arena::NodeId, tree::Tree};
+use aoc_2022::{NodeId, Tree};
 
 #[derive(Debug)]
 struct Directory {
@@ -100,7 +100,7 @@ impl Calculator {
         indirect
     }
 
-    pub fn get_result(mut self) -> usize {
+    pub fn into_result(mut self) -> usize {
         let root = self.tree.root().unwrap();
         self.node_indirect(root);
         self.tree

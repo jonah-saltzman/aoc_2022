@@ -23,6 +23,6 @@ fn main() {
         }
         buf.clear();
     }
-    let answer = calc.get_result();
+    let answer = calc.into_result();
     println!("{}", answer);
 }

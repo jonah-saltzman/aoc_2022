@@ -4,6 +4,6 @@ mod helpers {
     pub mod tree;
 }
 
-pub use helpers::arena;
-pub use helpers::min_heap;
-pub use helpers::tree;
+pub use helpers::{arena, arena::NodeId};
+pub use helpers::{min_heap, min_heap::MinHeap};
+pub use helpers::{tree, tree::Tree};

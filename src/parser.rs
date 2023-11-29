@@ -13,7 +13,6 @@ pub enum Command {
 
 #[derive(Debug)]
 pub struct LsFile {
-    pub name: String,
     pub size: usize,
 }
 
@@ -129,8 +128,7 @@ impl Parser {
             }
             bytes => {
                 let size: usize = bytes.parse().unwrap();
-                let name = tokens.next().unwrap().to_owned();
-                LsLine::File(LsFile { name, size })
+                LsLine::File(LsFile { size })
             }
         }
     }
