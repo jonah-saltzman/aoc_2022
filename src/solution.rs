@@ -1,6 +1,9 @@
 use crate::parser::{CdTarget, Command, Group, LsLine, LsOutput};
 use aoc_2022::{NodeId, Tree};
 
+const TOTAL_SIZE: usize = 70000000;
+const TARGET_SIZE: usize = 30000000;
+
 #[derive(Debug)]
 struct Directory {
     name: String,
@@ -15,6 +18,14 @@ impl Directory {
             size_direct: 0,
             size_indirect: None,
         }
+    }
+
+    fn sizes(&self) -> (usize, Option<usize>) {
+        (self.size_direct, self.size_indirect)
+    }
+
+    fn size_unchecked(&self) -> usize {
+        self.size_direct + self.size_indirect.unwrap()
     }
 }
 
@@ -89,11 +100,8 @@ impl Calculator {
         let children: Vec<NodeId> = self.tree.children_ids(node_id).copied().collect();
         let mut indirect: usize = 0;
         for child_id in children {
-            let child = self.tree.get(child_id);
-            let child_direct = child.size_direct;
-            let initial_child_indirect = child.size_indirect;
-            let child_indirect =
-                initial_child_indirect.unwrap_or_else(|| self.node_indirect(child_id));
+            let (child_direct, child_indirect) = self.tree.get(child_id).sizes();
+            let child_indirect = child_indirect.unwrap_or_else(|| self.node_indirect(child_id));
             indirect += child_direct + child_indirect;
         }
         self.tree.get_mut(node_id).size_indirect = Some(indirect);
@@ -103,16 +111,20 @@ impl Calculator {
     pub fn into_result(mut self) -> usize {
         let root = self.tree.root().unwrap();
         self.node_indirect(root);
+        let used = self.tree.get(root).size_unchecked();
+        let unused = TOTAL_SIZE - used;
+        assert!(unused < TARGET_SIZE);
+        let to_delete = TARGET_SIZE - unused;
         self.tree
             .into_iter()
-            .filter_map(|node| {
-                let total = node.size_direct + node.size_indirect.unwrap();
-                if total <= 100000 {
-                    Some(total)
+            .filter_map(|dir| {
+                if dir.size_unchecked() >= to_delete {
+                    Some(dir.size_unchecked())
                 } else {
                     None
                 }
             })
-            .sum()
+            .min()
+            .unwrap()
     }
 }
