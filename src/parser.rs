@@ -30,6 +30,12 @@ pub enum LsLine {
 #[derive(Debug)]
 pub struct LsOutput(Vec<LsLine>);
 
+impl LsOutput {
+    pub fn push(&mut self, line: LsLine) {
+        self.0.push(line)
+    }
+}
+
 impl IntoIterator for LsOutput {
     type Item = LsLine;
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -74,8 +80,8 @@ impl Parser {
                 };
                 vec![Group::Input(command)]
             }
-            ParserState::Output(output) => match (output, line.starts_with('$')) {
-                (lines, true) => {
+            ParserState::Output(mut lines) => {
+                if line.starts_with('$') {
                     let command = Parser::parse_command(tokens.skip(1));
                     self.state = match command {
                         Command::Ls => Some(ParserState::Output(LsOutput(vec![]))),
@@ -84,14 +90,13 @@ impl Parser {
                     let command = Group::Input(command);
                     let ls_output = Group::Output(lines);
                     vec![ls_output, command]
-                }
-                (mut lines, false) => {
+                } else {
                     let new_ls_line = Parser::parse_lsline(tokens);
-                    lines.0.push(new_ls_line);
+                    lines.push(new_ls_line);
                     self.state = Some(ParserState::Output(lines));
                     vec![]
                 }
-            },
+            }
         }
     }
 
