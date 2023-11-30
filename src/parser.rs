@@ -73,20 +73,12 @@ impl Parser {
         let tokens = line.split(' ');
         match self.state.take().unwrap() {
             ParserState::Input => {
-                let command = Parser::parse_command(tokens.skip(1));
-                self.state = match command {
-                    Command::Ls => Some(ParserState::Output(LsOutput(vec![]))),
-                    Command::Cd(_) => Some(ParserState::Input),
-                };
+                let command = self.handle_command(tokens.skip(1));
                 vec![Group::Input(command)]
             }
             ParserState::Output(mut lines) => {
                 if line.starts_with('$') {
-                    let command = Parser::parse_command(tokens.skip(1));
-                    self.state = match command {
-                        Command::Ls => Some(ParserState::Output(LsOutput(vec![]))),
-                        Command::Cd(_) => Some(ParserState::Input),
-                    };
+                    let command = self.handle_command(tokens.skip(1));
                     let command = Group::Input(command);
                     let ls_output = Group::Output(lines);
                     vec![ls_output, command]
@@ -98,6 +90,15 @@ impl Parser {
                 }
             }
         }
+    }
+
+    fn handle_command<'a>(&mut self, tokens: impl Iterator<Item = &'a str>) -> Command {
+        let command = Parser::parse_command(tokens);
+        self.state = match command {
+            Command::Ls => Some(ParserState::Output(LsOutput(vec![]))),
+            Command::Cd(_) => Some(ParserState::Input),
+        };
+        command
     }
 
     pub fn end(&mut self) -> Option<Group> {
