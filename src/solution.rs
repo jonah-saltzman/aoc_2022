@@ -1,130 +1,72 @@
-use crate::parser::{CdTarget, Command, Group, LsLine, LsOutput};
-use aoc_2022::{NodeId, Tree};
-
-const TOTAL_SIZE: usize = 70000000;
-const TARGET_SIZE: usize = 30000000;
-
-#[derive(Debug)]
-struct Directory {
-    name: String,
-    size_direct: usize,
-    size_indirect: Option<usize>,
-}
-
-impl Directory {
-    fn new(name: &str) -> Self {
-        Self {
-            name: name.to_owned(),
-            size_direct: 0,
-            size_indirect: None,
-        }
-    }
-
-    fn sizes(&self) -> (usize, Option<usize>) {
-        (self.size_direct, self.size_indirect)
-    }
-
-    fn size_unchecked(&self) -> usize {
-        self.size_direct + self.size_indirect.unwrap()
-    }
-}
-
+#[derive(Default)]
 pub struct Calculator {
-    tree: Tree<Directory>,
-    current_node: Option<NodeId>,
+    board: Vec<Vec<u8>>,
+    max_top: Vec<u8>,
+    visible_trees: Vec<Vec<bool>>,
 }
 
 impl Calculator {
     pub fn new() -> Self {
-        Self {
-            tree: Tree::new(),
-            current_node: None,
-        }
+        Default::default()
     }
 
-    pub fn handle_group(&mut self, group: Group) {
-        match group {
-            Group::Input(Command::Ls) => assert!(self.current_node.is_some()),
-            Group::Input(Command::Cd(dir)) => self.change_dir(dir),
-            Group::Output(out) => self.handle_output(out),
+    pub fn handle_line(&mut self, line: Vec<u8>) {
+        let mut max_left: u8 = 0;
+        let mut max_right: u8 = 0;
+        let len = line.len();
+
+        if self.max_top.is_empty() {
+            self.max_top = vec![0; len];
         }
+
+        let mut visible_trees = vec![false; len];
+
+        let mut i: usize = 0;
+        while i < len {
+            let max_top = self.max_top[i];
+            let l_idx = i;
+            let r_idx = len - i - 1;
+            let left = line[l_idx];
+            let right = line[r_idx];
+
+            if left > max_left {
+                visible_trees[l_idx] = true;
+            }
+            if right > max_right {
+                visible_trees[r_idx] = true;
+            }
+            if left > max_top {
+                visible_trees[l_idx] = true;
+            }
+
+            max_left = max_left.max(left);
+            max_right = max_right.max(right);
+            self.max_top[i] = self.max_top[i].max(left);
+
+            i += 1;
+        }
+        self.visible_trees.push(visible_trees);
+        self.board.push(line);
     }
 
-    fn change_dir(&mut self, dir: CdTarget) {
-        match dir {
-            CdTarget::Root => {
-                if self.current_node.is_none() {
-                    let root = Directory::new("/");
-                    let root = self.tree.add_node(root, None).unwrap();
-                    self.current_node = Some(root);
-                } else {
-                    self.current_node = Some(self.tree.root().unwrap());
+    fn calculate_from_bottom(&mut self) {
+        let mut max_bottom: Vec<u8> = vec![0; self.max_top.len()];
+        for (y, line) in self.board.iter().enumerate().rev() {
+            for (x, &n) in line.iter().enumerate() {
+                if n > max_bottom[x] {
+                    self.visible_trees[y][x] = true;
                 }
-            }
-            CdTarget::Parent => {
-                let parent = self.tree.parent(self.current_node.unwrap()).unwrap();
-                self.current_node = Some(parent);
-            }
-            CdTarget::Named(target) => {
-                let current = self.current_node.unwrap();
-                let (child_id, _) = self
-                    .tree
-                    .children(current)
-                    .find(|&(_, dir)| dir.name == target)
-                    .unwrap();
-                self.current_node = Some(child_id);
+                max_bottom[x] = max_bottom[x].max(n);
             }
         }
-    }
-
-    fn handle_output(&mut self, list: LsOutput) {
-        for element in list.into_iter() {
-            match element {
-                LsLine::File(file) => {
-                    let current = self.tree.get_mut(self.current_node.unwrap());
-                    current.size_direct += file.size;
-                }
-                LsLine::Folder(folder) => {
-                    let current = self.current_node.unwrap();
-                    let new_node = Directory::new(&folder.name);
-                    self.tree.add_node(new_node, Some(current)).unwrap();
-                }
-            }
-        }
-    }
-
-    fn node_indirect(&mut self, node_id: NodeId) -> usize {
-        if let Some(size) = self.tree.get(node_id).size_indirect {
-            return size;
-        }
-        let children: Vec<NodeId> = self.tree.children_ids(node_id).copied().collect();
-        let mut indirect: usize = 0;
-        for child_id in children {
-            let (child_direct, child_indirect) = self.tree.get(child_id).sizes();
-            let child_indirect = child_indirect.unwrap_or_else(|| self.node_indirect(child_id));
-            indirect += child_direct + child_indirect;
-        }
-        self.tree.get_mut(node_id).size_indirect = Some(indirect);
-        indirect
     }
 
     pub fn into_result(mut self) -> usize {
-        let root = self.tree.root().unwrap();
-        self.node_indirect(root);
-        let used = self.tree.get(root).size_unchecked();
-        let unused = TOTAL_SIZE - used;
-        assert!(unused < TARGET_SIZE);
-        let to_delete = TARGET_SIZE - unused;
-        self.tree
+        self.calculate_from_bottom();
+        self.visible_trees
             .into_iter()
-            .filter_map(|dir| {
-                if dir.size_unchecked() >= to_delete {
-                    Some(dir.size_unchecked())
-                } else {
-                    None
-                }
-            })
-            .min()
-            .unwrap()
+            .flat_map(|line| line.into_iter())
+            .filter(|&b| b)
+            .count()
     }
 }
